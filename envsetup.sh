@@ -6,9 +6,13 @@ Invoke ". build/envsetup.sh" from your shell to add the following functions to y
 - croot:   Changes directory to the top of the tree.
 - m:       Makes from the top of the tree.
 - mm:      Builds all of the modules in the current directory, but not their dependencies.
+- mmp:     Builds all of the modules in the current directory and pushes them to the device.
 - mmm:     Builds all of the modules in the supplied directories, but not their dependencies.
+- mmmp:    Builds all of the modules in the supplied directories and pushes them to the device.
 - mma:     Builds all of the modules in the current directory, and their dependencies.
 - mmma:    Builds all of the modules in the supplied directories, and their dependencies.
+- mfwk:    Build frameworks/base projects
+- mfwkp:   Build frameworks/base projects and pushes them to the device
 - cgrep:   Greps on all local C/C++ files.
 - jgrep:   Greps on all local Java files.
 - resgrep: Greps on all local res/*.xml files.
@@ -24,6 +28,11 @@ EOF
     done
     echo $A
 }
+
+alias mmp='dopush mm'
+alias mmmp='dopush mmm'
+alias mfwk='mmm frameworks/base/core/res frameworks/base frameworks/base/services/java frameworks/base/packages/SystemUI'
+alias mfwkp='dopush mmm frameworks/base/core/res frameworks/base frameworks/base/services/java frameworks/base/packages/SystemUI'
 
 # Get the value of a build variable as an absolute path.
 function get_abs_build_var()
@@ -758,6 +767,70 @@ function mmma()
   else
     echo "Couldn't locate the top of the tree.  Try setting TOP."
   fi
+}
+
+# Credit for color strip sed: http://goo.gl/BoIcm
+# Original implementation was taken from CyanogenMod's envsetup.sh
+function dopush()
+{
+    local func=$1
+    shift
+
+    adb start-server # Prevent unexpected starting server message from adb get-state in the next line
+    if [ "$(adb get-state)" != device -a "$(adb shell busybox test -e /sbin/recovery 2> /dev/null; echo $?)" != 0 ] ; then
+        echo "No device is online. Waiting for one..."
+        echo "Please connect USB and/or enable USB debugging"
+        until [ "$(adb get-state)" = device -o "$(adb shell busybox test -e /sbin/recovery 2> /dev/null; echo $?)" = 0 ];do
+            sleep 1
+        done
+        echo "Device Found."
+    fi
+
+    # retrieve IP and PORT info if we're using a TCP connection
+    TCPIPPORT=$(adb devices | egrep '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:[0-9]+[^0-9]+' \
+        | head -1 | awk '{print $1}')
+    adb root &> /dev/null
+    sleep 0.3
+    if [ -n "$TCPIPPORT" ]
+    then
+        # adb root just killed our connection
+        # so reconnect...
+        adb connect "$TCPIPPORT"
+    fi
+    adb wait-for-device &> /dev/null
+    sleep 0.3
+    adb remount &> /dev/null
+
+    # Running the function we planned on running
+    $func $*
+
+    # Running adb sync, to sync all the changed modules to the device.
+    # Since ADB writes to stderr, we'll redirect it to stdout and also to the .log file
+    adb sync 2>&1 | tee $OUT/.log
+
+    # Looking for rows with this structure: "push: <local file> -> <remote file>"
+    LOC=$(cat $OUT/.log | sed -r 's/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K]//g' | grep 'push:' | cut -d ' ' -f 4)
+
+    if [ ! -z "$LOC" -a "$LOC" != " " ]; then
+        echo -e "\n ** Number of files synced - $(echo $LOC | wc -l) **\n"
+    else
+        echo -e "\n ** No files were synced to the device **\n"
+    fi
+
+    # If one of the synced files require restarting the shell - do that
+    while read -r file; do
+        case $file in 
+        */SystemUI.apk|/system/framework/*)
+                echo -e " ** Restarting the shell **\n"
+                adb shell stop
+                adb shell start
+                break
+        ;;
+        esac
+    done <<< "$LOC"
+
+    rm -f $OUT/.log
+    return 0
 }
 
 function croot()
