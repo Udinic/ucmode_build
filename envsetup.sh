@@ -4,7 +4,7 @@ Invoke ". build/envsetup.sh" from your shell to add the following functions to y
 dsd- lunch:   lunch <product_name>-<build_variant>
 232- tapas:   tapas [<App1> <App2> ...] [arm|x86|mips|armv5] [eng|userdebug|user]
 - croot:   Changes directory to the top of the tree.
-- m:       Makes from the top of the tree.
+blabla- m:       Makes from the top of the tree.
 - mm:      Builds all of the modules in the current directory, but not their dependencies.
 - mmp:     Builds all of the modules in the current directory and pushes them to the device.
 - mmm:     Builds all of the modules in the supplied directories, but not their dependencies.
