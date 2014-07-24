@@ -16,7 +16,7 @@ blabla- m:       Makes from the top of the tree.
 - cgrep:   Greps on all local C/C++ files.
 - jgrep:   Greps on all local Java files.
 - resgrep: Greps on all local res/*.xml files.
-- godir:   Go to the directory containing a file.
+dsd- godir:   Go to the directory containing a file.
 
 Look at the source to view more functions. The complete list is:
 EOF
